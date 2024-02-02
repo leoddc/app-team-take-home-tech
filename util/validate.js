@@ -11,9 +11,14 @@ const run_schema = Joi.object({
     runner_note: Joi.string(),
 });
 
+const image_schema = Joi.object({
+    run_id: Joi.number().required(),
+    mime_type: Joi.string().pattern(new RegExp('^image\/(png|jpeg)$')).required(),
+});
+
 const user_schema = Joi.object({
     first_name: Joi.string().required(),
     last_name: Joi.string().required(),
 });
 
-module.exports = { run_schema, user_schema };
+module.exports = { run_schema, user_schema, image_schema };

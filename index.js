@@ -3,10 +3,10 @@ const port = 3000;
 const bodyParser = require('body-parser');
 const db = require('./init/initDb');
 
-const filter = require('./util/filter');
+const { filter, filterOptionsFromReq } = require('./util/filter');
 const getRunImageIds = require('./util/getRunImages');
 const runExists = require('./util/runExists');
-const { run_schema, user_schema } = require('./util/validate');
+const { run_schema, user_schema, image_schema } = require('./util/validate');
 
 const app = express();
 app.use(bodyParser.json());
@@ -19,9 +19,12 @@ const parseRawBody = bodyParser.raw({
 
 app.post('/add-run', (req, res) => {
 
-    run_schema.validate(); // unused rn
+    const { error, value } = run_schema.validate(req.body);
+    const { user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note } = value;
 
-    const { user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note } = req.body;
+    if (error) {
+        return res.status(500).send({ success: false, error: error.details });
+    }
 
     const sql = `INSERT INTO runs (user_id, 
                                     nick_name, 
@@ -50,15 +53,28 @@ app.post('/add-run', (req, res) => {
 });
 
 app.post('/add-run-image', parseRawBody, async (req, res) => {
-    const runId = req.query.run_id;
+
+    const unvalidatedData = {
+        run_id: req.query.run_id,
+        mime_type: req.headers['content-type'],
+    }
+
+    const { error, value } = image_schema.validate(unvalidatedData);
+
+    if (error) {
+        return res.status(500).send({ success: false, message: error.details });
+    }
+
+    const runId = value.run_id;
+    const contentType = value.mime_type;
+
+    console.log(value)
+
     const userId = req.query.user_id;
-    const contentType = req.headers['content-type'];
 
     if (!contentType) {
         return res.status(500).send({ success: false, message: 'content-type must be image' });
     }
-
-    console.log(contentType);
 
     if (!runId || !userId) {
         return res.status(500).send({ success: false, message: 'Missing run_id or user_id parameters.'});
@@ -82,7 +98,7 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
 
 app.get('/run-images/:image_id', (req, res) => {
     const imageId = req.params.image_id;
-    const sql = `SELECT run_image_base_64 FROM run_images WHERE image_id = ?`;
+    const sql = `SELECT run_image_base_64, mime_type FROM run_images WHERE image_id = ?`;
     const params = [imageId];
 
     db.get(sql, params, (err, row) => {
@@ -93,10 +109,8 @@ app.get('/run-images/:image_id', (req, res) => {
         if (row) {
             const imgBuffer = Buffer.from(row.run_image_base_64, 'base64');
 
-            // Setting the Content-Type header to display the image directly
-            console.log(row.mime_type);
             res.writeHead(200, {
-                'Content-Type': 'image/jpeg', // in theory, this is programatic.
+                'Content-Type': row.mime_type,
                 'Content-Length': imgBuffer.length
             });
             res.end(imgBuffer);
@@ -106,17 +120,15 @@ app.get('/run-images/:image_id', (req, res) => {
     });
 });
 
+app.get('/user/:user_id/get-aggregate-run-data', async (req, res) => {
+
+    const options = filterOptionsFromReq(req);
+
+});
+
 app.get('/user/:user_id/get-runs', async (req, res) => {
 
-    const options = {
-        userId: req.params.user_id,
-        minDistance: parseFloat(req.query.min_distance),
-        maxDistance: parseFloat(req.query.max_distance),
-        minTime: parseInt(req.query.min_time),
-        maxTime: parseInt(req.query.max_time),
-        minAvgHr: parseInt(req.query.min_avg_heart_rate),
-        maxAvgHr: parseInt(req.query.max_avg_heart_rate),
-    }
+    const options = filterOptionsFromReq(req);
 
     try {
         let rows = await filter(options);

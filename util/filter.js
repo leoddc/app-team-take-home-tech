@@ -39,4 +39,16 @@ async function filter(options) {
     });
 }
 
-module.exports = filter;
+function filterOptionsFromReq(req) {
+    return options = {
+        userId: req.params.user_id,
+        minDistance: parseFloat(req.query.min_distance),
+        maxDistance: parseFloat(req.query.max_distance),
+        minTime: parseInt(req.query.min_time),
+        maxTime: parseInt(req.query.max_time),
+        minAvgHr: parseInt(req.query.min_avg_heart_rate),
+        maxAvgHr: parseInt(req.query.max_avg_heart_rate),
+    }
+}
+
+module.exports = { filter, filterOptionsFromReq };
