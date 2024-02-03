@@ -40,7 +40,7 @@ Optionally add an image to a run. Parameters are sent in the url and the image i
 
 `user_id: Int` The user id associated with the run and image
 
-`run_id` The run associated with the image
+`run_id: Int` The run associated with the image
 
 ### runs
 
