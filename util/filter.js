@@ -1,8 +1,17 @@
 const db = require('../init/initDb');
+const { metric_data } = require('./validate');
 
-async function filter(options) {
-    let sql = `SELECT * FROM runs WHERE user_id = ?`;
-    let params = [options.userId];
+const sqlFunctions = {
+    'avg': 'AVG',
+    'sum': 'SUM',
+    'max': 'MAX',
+    'min': 'MIN',
+};
+
+
+function _buildFilterWhereSql(options) {
+    let sql = `WHERE user_id = ?`;
+    let params = [];
 
     if (!isNaN(options.minDistance)) {
         sql += ` AND distance_in_km >= ?`;
@@ -28,7 +37,50 @@ async function filter(options) {
         sql += ` AND avg_heart_rate <= ?`;
         params.push(options.maxAvgHr);
     }
-    
+    if (!isNaN(options.minDuration)) {
+        sql += ` AND duration_in_ms >= ?`;
+        params.push(options.minDuration);
+    }
+    if (!isNaN(options.maxDuration)) {
+        sql += ` AND duration_in_ms <= ?`;
+        params.push(options.maxDuration);
+    }
+    return params, sql;
+}
+
+function _buildAggregateFilterSql(metrics) {
+    let sql = '';
+    for (let opt of Object.values(metrics)) {
+        let sqlFunc = '';
+        sqlFunc += sqlFunctions[opt.type];
+        sqlFunc += ` (${opt.metric})`; // the sql col value
+        sqlFunc += ` AS ${opt.type}_${opt.metric},`; // for better readability, added comma for separation
+
+        sql += sqlFunc;
+    }
+
+    return sql.slice(0, -1); // remove trailing comma
+}
+
+
+async function filter(options) {
+    const { params, filterSql } = _buildFilterWhereSql(options);
+    const sql = `SELECT * FROM runs ${filterSql}`;
+
+    return new Promise((resolve, reject) => {
+        db.all(sql, params, async (error, rows) => {
+            if (error) {
+                reject(error);
+            }
+            resolve(rows);
+        });
+    });
+}
+
+async function aggregateFilter(options, aggregateOptions) {
+    const sql = `SELECT ${_buildAggregateFilterSql(aggregateOptions)} FROM runs ${_buildFilterWhereSql(options)}`;
+    const params = [options.userId];
+
     return new Promise((resolve, reject) => {
         db.all(sql, params, async (error, rows) => {
             if (error) {
@@ -46,9 +98,38 @@ function filterOptionsFromReq(req) {
         maxDistance: parseFloat(req.query.max_distance),
         minTime: parseInt(req.query.min_time),
         maxTime: parseInt(req.query.max_time),
+        minDuration: parseInt(req.query.min_duration),
+        maxDuration: parseInt(req.query.max_duration),
         minAvgHr: parseInt(req.query.min_avg_heart_rate),
         maxAvgHr: parseInt(req.query.max_avg_heart_rate),
     }
 }
 
-module.exports = { filter, filterOptionsFromReq };
+function filterAggregateOptionsFromReq(req) {
+    const metricsRaw = req.query.metrics.split(',');
+    let metrics = [];
+    if (metricsRaw.length === 0) {
+        return [];
+    }
+
+    metricsRaw.forEach(met => {
+        const metSplit = met.split(':');
+        const metData = {
+            metric: metSplit[0],
+            type: metSplit[1],
+        };
+
+        console.log(metData)
+
+        const { error, value } = metric_data.validate(metData);
+
+        if (error) {
+            throw new Error(error);
+        }
+        metrics.push(value);
+    });
+
+    return metrics;
+}
+
+module.exports = { filter, filterOptionsFromReq, aggregateFilter, filterAggregateOptionsFromReq };

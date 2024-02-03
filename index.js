@@ -3,7 +3,7 @@ const port = 3000;
 const bodyParser = require('body-parser');
 const db = require('./init/initDb');
 
-const { filter, filterOptionsFromReq } = require('./util/filter');
+const { filter, filterOptionsFromReq, aggregateFilter, filterAggregateOptionsFromReq } = require('./util/filter');
 const getRunImageIds = require('./util/getRunImages');
 const runExists = require('./util/runExists');
 const { run_schema, user_schema, image_schema } = require('./util/validate');
@@ -38,7 +38,7 @@ app.post('/add-run', (req, res) => {
 
     db.run(sql, [user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note], function (err) {
         if (err) {
-            res.status(400).json({ 'success': false, 'error': err.message });
+            res.status(400).json({ 'success': false, 'message': err.message });
             return;
         }
         res.json({
@@ -62,7 +62,7 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
     const { error, value } = image_schema.validate(unvalidatedData);
 
     if (error) {
-        return res.status(500).send({ success: false, message: error.details });
+        return res.status(400).send({ success: false, message: error.details });
     }
 
     const runId = value.run_id;
@@ -77,10 +77,10 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
     }
 
     if (!runId || !userId) {
-        return res.status(500).send({ success: false, message: 'Missing run_id or user_id parameters.'});
+        return res.status(500).send({ success: false, message: 'Missing run_id or user_id parameters.' });
     }
     if (!await runExists(runId)) {
-        return res.status(500).send({ success: false, message: 'Run with that ID does not exist.'})
+        return res.status(500).send({ success: false, message: 'Run with that ID does not exist.' })
     }
 
     // convert binary file body to base64 string for storing directly in db
@@ -90,7 +90,7 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
 
     db.run(sql, [runId, imageBase64, contentType], function (error) {
         if (error) {
-            return res.status(500).json({ 'success': false, 'error': error.message });
+            return res.status(500).json({ 'success': false, 'message': error.message });
         }
         res.json({ 'success': true, 'message': `Image updated` });
     });
@@ -101,9 +101,9 @@ app.get('/run-images/:image_id', (req, res) => {
     const sql = `SELECT run_image_base_64, mime_type FROM run_images WHERE image_id = ?`;
     const params = [imageId];
 
-    db.get(sql, params, (err, row) => {
-        if (err) {
-            res.status(500).json({ "success": false, "error": err.message });
+    db.get(sql, params, (error, row) => {
+        if (error) {
+            res.status(500).json({ 'success': false, 'message': error.message });
             return;
         }
         if (row) {
@@ -115,19 +115,32 @@ app.get('/run-images/:image_id', (req, res) => {
             });
             res.end(imgBuffer);
         } else {
-            res.status(404).json({ "success": false, "message": "Image not found" });
+            res.status(404).json({ 'success': false, 'message': 'Image not found' });
         }
     });
 });
 
-app.get('/user/:user_id/get-aggregate-run-data', async (req, res) => {
-
+app.get('/user/:user_id/aggregate-run-data', async (req, res) => {
     const options = filterOptionsFromReq(req);
+    const aggregateOptions = filterAggregateOptionsFromReq(req);
+
+    try {
+        const rows = await aggregateFilter(options, aggregateOptions);
+        if (rows.length > 1) {
+            res.status(500).send({ 'success': false, 'message': 'Unresolved error' })
+        }
+        res.json({
+            'success': true,
+            'data': rows[0],
+        });
+    }
+    catch (error) {
+        return res.status(500).json({ 'success': false, 'success': error.message });
+    }
 
 });
 
-app.get('/user/:user_id/get-runs', async (req, res) => {
-
+app.get('/user/:user_id/runs', async (req, res) => {
     const options = filterOptionsFromReq(req);
 
     try {
@@ -140,17 +153,17 @@ app.get('/user/:user_id/get-runs', async (req, res) => {
                 ...run,
                 image_ids: image_ids
             };
-            console.log('rundata', runData);
             rowsWithImageIds.push(runData);
         }
 
         res.json({
-            "success": true,
-            "data": rowsWithImageIds
+            'success': true,
+            'data': rowsWithImageIds
         });
     }
     catch (error) {
-        res.status(500).json({ "success": false, "error": error.message });
+        console.error(error);
+        return res.status(500).json({ 'success': false, 'message': error.message });
     }
 });
 
