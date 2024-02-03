@@ -5,7 +5,7 @@ const db = require('./init/initDb');
 
 const { filter, filterOptionsFromReq, aggregateFilter, filterAggregateOptionsFromReq } = require('./util/filter');
 const getRunImageIds = require('./util/getRunImages');
-const runExists = require('./util/runExists');
+const { runExists, getRunById } = require('./util/runs');
 const { run_schema, user_schema, image_schema } = require('./util/validate');
 
 const app = express();

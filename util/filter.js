@@ -22,7 +22,6 @@ const runTable = {
     'end_time_in_ux_ms': 'end_time_in_ux_ms'
 };
 
-
 function _buildFilterWhereSql(options) {
     let filterSql = `WHERE user_id = ?`;
     let filterParams = [options.userId];
