@@ -1,6 +1,12 @@
 const db = require('../init/initDb');
 const { metric_data } = require('./validate');
 
+/*
+I don't love this, but SQLite doesn't let you use the '?' placeholder
+for column names. This is a fast way of cleaning the data to avoid sql injetion.
+Otherwise, we'd just take the string straight from the url and run it in sql.
+This is also true for aliases.
+*/
 const sqlFunctions = {
     'avg': 'AVG',
     'sum': 'SUM',
@@ -8,68 +14,76 @@ const sqlFunctions = {
     'min': 'MIN',
 };
 
+const runTable = {
+    'duration_in_ms': 'duration_in_ms',
+    'distance_in_km': 'distance_in_km',
+    'avg_heart_rate': 'avg_heart_rate',
+    'start_time_in_ux_ms': 'start_time_in_ux_ms',
+    'end_time_in_ux_ms': 'end_time_in_ux_ms'
+};
+
 
 function _buildFilterWhereSql(options) {
-    let sql = `WHERE user_id = ?`;
-    let params = [];
+    let filterSql = `WHERE user_id = ?`;
+    let filterParams = [options.userId];
 
     if (!isNaN(options.minDistance)) {
-        sql += ` AND distance_in_km >= ?`;
-        params.push(options.minDistance);
+        filterSql += ` AND distance_in_km >= ?`;
+        filterParams.push(options.minDistance);
     }
     if (!isNaN(options.maxDistance)) {
-        sql += ` AND distance_in_km <= ?`;
-        params.push(options.maxDistance);
+        filterSql += ` AND distance_in_km <= ?`;
+        filterParams.push(options.maxDistance);
     }
     if (!isNaN(options.minTime)) {
-        sql += ` AND start_time_in_ux_ms >= ?`;
-        params.push(options.minTime);
+        filterSql += ` AND start_time_in_ux_ms >= ?`;
+        filterParams.push(options.minTime);
     }
     if (!isNaN(options.maxTime)) {
-        sql += ` AND end_time_in_ux_ms <= ?`;
-        params.push(options.maxTime);
+        filterSql += ` AND end_time_in_ux_ms <= ?`;
+        filterParams.push(options.maxTime);
     }
     if (!isNaN(options.minAvgHr)) {
-        sql += ` AND avg_heart_rate >= ?`;
-        params.push(options.minAvgHr);
+        filterSql += ` AND avg_heart_rate >= ?`;
+        filterParams.push(options.minAvgHr);
     }
     if (!isNaN(options.maxAvgHr)) {
-        sql += ` AND avg_heart_rate <= ?`;
-        params.push(options.maxAvgHr);
+        filterSql += ` AND avg_heart_rate <= ?`;
+        filterParams.push(options.maxAvgHr);
     }
     if (!isNaN(options.minDuration)) {
-        sql += ` AND duration_in_ms >= ?`;
-        params.push(options.minDuration);
+        filterSql += ` AND duration_in_ms >= ?`;
+        filterParams.push(options.minDuration);
     }
     if (!isNaN(options.maxDuration)) {
-        sql += ` AND duration_in_ms <= ?`;
-        params.push(options.maxDuration);
+        filterSql += ` AND duration_in_ms <= ?`;
+        filterParams.push(options.maxDuration);
     }
-    return params, sql;
+    return { filterParams, filterSql };
 }
 
 function _buildAggregateFilterSql(metrics) {
     let sql = '';
-    for (let opt of Object.values(metrics)) {
-        let sqlFunc = '';
-        sqlFunc += sqlFunctions[opt.type];
-        sqlFunc += ` (${opt.metric})`; // the sql col value
-        sqlFunc += ` AS ${opt.type}_${opt.metric},`; // for better readability, added comma for separation
+    let agParams = [];
 
+    for (let opt of metrics) {
+        let sqlFunc = sqlFunctions[opt.type] + ` (${runTable[opt.metric]}) AS ${opt.type}_${opt.metric},`;
         sql += sqlFunc;
     }
 
-    return sql.slice(0, -1); // remove trailing comma
+    const agSql = sql.slice(0, -1); // remove trailing comma
+    return { agParams, agSql };
 }
 
 
 async function filter(options) {
-    const { params, filterSql } = _buildFilterWhereSql(options);
+    const { filterParams, filterSql } = _buildFilterWhereSql(options);
     const sql = `SELECT * FROM runs ${filterSql}`;
 
     return new Promise((resolve, reject) => {
-        db.all(sql, params, async (error, rows) => {
+        db.all(sql, filterParams, async (error, rows) => {
             if (error) {
+                console.error(error);
                 reject(error);
             }
             resolve(rows);
@@ -78,12 +92,17 @@ async function filter(options) {
 }
 
 async function aggregateFilter(options, aggregateOptions) {
-    const sql = `SELECT ${_buildAggregateFilterSql(aggregateOptions)} FROM runs ${_buildFilterWhereSql(options)}`;
-    const params = [options.userId];
+    const { filterParams, filterSql } = _buildFilterWhereSql(options);
+    const { agParams, agSql } = _buildAggregateFilterSql(aggregateOptions);
+    const sql = `SELECT ${agSql} FROM runs ${filterSql}`;
+
+    console.log(filterParams)
+    const params = [...agParams, ...filterParams];
 
     return new Promise((resolve, reject) => {
         db.all(sql, params, async (error, rows) => {
             if (error) {
+                console.error(error)
                 reject(error);
             }
             resolve(rows);
@@ -118,8 +137,6 @@ function filterAggregateOptionsFromReq(req) {
             metric: metSplit[0],
             type: metSplit[1],
         };
-
-        console.log(metData)
 
         const { error, value } = metric_data.validate(metData);
 

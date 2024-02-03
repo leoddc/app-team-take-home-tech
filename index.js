@@ -23,7 +23,7 @@ app.post('/add-run', (req, res) => {
     const { user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note } = value;
 
     if (error) {
-        return res.status(500).send({ success: false, error: error.details });
+        return res.status(400).send({ success: false, error: error.details });
     }
 
     const sql = `INSERT INTO runs (user_id, 
@@ -36,14 +36,14 @@ app.post('/add-run', (req, res) => {
                                     runner_note) 
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    db.run(sql, [user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note], function (err) {
-        if (err) {
-            res.status(400).json({ 'success': false, 'message': err.message });
+    db.run(sql, [user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note], function (error) {
+        if (error) {
+            res.status(400).json({ success: false, message: error.message });
             return;
         }
         res.json({
-            'success': true,
-            'message': 'Run posted',
+            success: true,
+            message: 'Run posted',
             'data': {
                 'run_id': this.lastID,
                 ...req.body
@@ -53,7 +53,6 @@ app.post('/add-run', (req, res) => {
 });
 
 app.post('/add-run-image', parseRawBody, async (req, res) => {
-
     const unvalidatedData = {
         run_id: req.query.run_id,
         mime_type: req.headers['content-type'],
@@ -73,14 +72,14 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
     const userId = req.query.user_id;
 
     if (!contentType) {
-        return res.status(500).send({ success: false, message: 'content-type must be image' });
+        return res.status(400).send({ success: false, message: 'content-type must be image' });
     }
 
     if (!runId || !userId) {
-        return res.status(500).send({ success: false, message: 'Missing run_id or user_id parameters.' });
+        return res.status(400).send({ success: false, message: 'Missing run_id or user_id parameters.' });
     }
     if (!await runExists(runId)) {
-        return res.status(500).send({ success: false, message: 'Run with that ID does not exist.' })
+        return res.status(400).send({ success: false, message: 'Run with that ID does not exist.' })
     }
 
     // convert binary file body to base64 string for storing directly in db
@@ -90,9 +89,9 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
 
     db.run(sql, [runId, imageBase64, contentType], function (error) {
         if (error) {
-            return res.status(500).json({ 'success': false, 'message': error.message });
+            return res.status(400).json({ success: false, message: error.message });
         }
-        res.json({ 'success': true, 'message': `Image updated` });
+        res.json({ success: true, data: { image_id: this.lastID } });
     });
 });
 
@@ -103,7 +102,7 @@ app.get('/run-images/:image_id', (req, res) => {
 
     db.get(sql, params, (error, row) => {
         if (error) {
-            res.status(500).json({ 'success': false, 'message': error.message });
+            res.status(400).json({ success: false, message: error.message });
             return;
         }
         if (row) {
@@ -115,7 +114,7 @@ app.get('/run-images/:image_id', (req, res) => {
             });
             res.end(imgBuffer);
         } else {
-            res.status(404).json({ 'success': false, 'message': 'Image not found' });
+            res.status(404).json({ success: false, message: 'Image not found' });
         }
     });
 });
@@ -127,15 +126,15 @@ app.get('/user/:user_id/aggregate-run-data', async (req, res) => {
     try {
         const rows = await aggregateFilter(options, aggregateOptions);
         if (rows.length > 1) {
-            res.status(500).send({ 'success': false, 'message': 'Unresolved error' })
+            res.status(500).send({ success: false, message: 'Unresolved error' })
         }
         res.json({
-            'success': true,
+            success: true,
             'data': rows[0],
         });
     }
     catch (error) {
-        return res.status(500).json({ 'success': false, 'success': error.message });
+        return res.status(500).json({ success: false, success: error.message });
     }
 
 });
@@ -157,13 +156,13 @@ app.get('/user/:user_id/runs', async (req, res) => {
         }
 
         res.json({
-            'success': true,
+            success: true,
             'data': rowsWithImageIds
         });
     }
     catch (error) {
         console.error(error);
-        return res.status(500).json({ 'success': false, 'message': error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 });
 

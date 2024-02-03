@@ -4,7 +4,7 @@ const db = new sqlite3.Database('./runwo.db', sqlite3.OPEN_READWRITE | sqlite3.O
     if (error) {
         console.error(error.message);
     }
-    console.log('db up');
+    console.log('DB is running');
 });
 
 db.run(`CREATE TABLE IF NOT EXISTS runs (
