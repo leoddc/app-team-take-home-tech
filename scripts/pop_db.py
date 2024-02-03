@@ -45,7 +45,6 @@ def main():
     total_runs = 10
 
     add_run(user_id, total_runs)
-    add_run_image(user_id, 1)
 
 if __name__ == "__main__":
     main()

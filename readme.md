@@ -5,6 +5,16 @@ This API allows for a client to submit run workouts, submit and retreive associa
 - All id attributes are incremented and numerical. In production, I would almost always use something like a UUID as incremented ids can pose a security risk.
 - The users functionality is incomplete. You cannot create, modify, or authenticate users as this is out of scope for the assignment. It would be fairly easy to integrate a complete user authentication system with the current setup, though.
 
+### Get Started
+
+1. Clone the repository and navigate to the containing directory.
+1. Run `npm install`
+1. Run `npm start`
+1. (optional) To populate the database with some test data, you can run the python script in `./scripts/pop_db.py`
+	- This script does not upload images correctly
+	- To upload images, use an API test client like Postman or Insomnia
+1. By default, the API will serve from `localhost:3000`
+
 ## API Design
 
 ### Tech Stack
