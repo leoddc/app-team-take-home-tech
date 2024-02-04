@@ -32,6 +32,23 @@ I used SQLite simply for the sake of being in a dev environment. For production,
 
 For data validation, I used a combination of Joi and custom validators. It was my first time using Joi and I felt it worked well for validating one dimensional objects. There was some data validation where Joi was overkill and I chose to use custom validation for ease and simplicity.
 
+### File Structure
+
+```
+|-- docs/
+|	|... # API Documentation
+|-- init/
+|	|... # DB Initializer. Creates DB and Tables
+|-- scripts/
+|	|-- insomnia-env.json # Importable Insomnia environment for API testing
+|	|-- pop_db.py # A python script to populate the DB
+|	|-- images/
+|	|	|... # Test images for run_images
+|-- util/
+|	|... Various functions, constants, validators, etc
+|-- index.js # The entry point for the API. Where all routes and the Express app live
+```
+
 ### Design Choices
 
 The main data model is the `run`. Everything in this API is essentially structured around a `run`. A run represents one run workout, here's an example:
@@ -70,3 +87,9 @@ I chose somewhere in the middle, leaning towards simplicity, but with added comp
 Some complexity is neccesary for data aggregation, though. I used a "shopping cart" model to allow the client to query specific statistics and apply functions to them within their query. I chose complexity over simplicity here because I felt it would actually be used rather than just serving as another blocking force.
 
 This was a challenge to implement, especially on the data validation side of things. The `metric` query structure for the aggregation endpoint is dynamic, so you're not going to get the same kind of input each time. The query needs to be parsed to get each statistic request. I think given the tools I was working with, I did this fairly well.
+
+## Additions
+
+With more, time I think I would both add some features and reiterate certain parts of the API. I would definitley add or complete the users functionality. I'd add user authentication, the ability to add users, the ability for users to login, etc. One feature I wanted to add but ran out of time was AI generated run summaries. The client could request a "run summary" for a specific run with the `run_id` and the server would go to the OpenAI API and prompt it to summarize the run given the details and metrics. 
+
+I would also potentially rethink the original runs endpoint where runs are requested. I might make it work in a way that is kind of similar to the aggregate feature. That is to say, more dynamic. Right now, the endpoint just has a set few query features, but this doesn't scale super well if you wanted to modify the data model or add new parameters. If I had more time, I may have made this dynamic so that the server computes custom parameters like it does with the aggregate endpoint.

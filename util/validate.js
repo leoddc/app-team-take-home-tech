@@ -11,6 +11,18 @@ const run_schema = Joi.object({
     runner_note: Joi.string(),
 });
 
+const run_options_schema = Joi.object({
+    userId: Joi.string().optional().allow(NaN),
+    minDistance: Joi.number().optional().allow(NaN),
+    maxDistance: Joi.number().optional().allow(NaN),
+    minTime: Joi.number().optional().allow(NaN),
+    maxTime: Joi.number().optional().allow(NaN),
+    minDuration: Joi.number().optional().allow(NaN),
+    maxDuration: Joi.number().optional().allow(NaN),
+    minAvgHr: Joi.number().optional().allow(NaN),
+    maxAvgHr: Joi.number().optional().allow(NaN)
+})
+
 const image_schema = Joi.object({
     run_id: Joi.number().required(),
     mime_type: Joi.string().pattern(new RegExp('^image\/(png|jpeg)$')).required(),
@@ -26,4 +38,4 @@ const user_schema = Joi.object({
     last_name: Joi.string().required(),
 });
 
-module.exports = { run_schema, user_schema, image_schema, metric_data };
+module.exports = { run_schema, image_schema, metric_data, run_options_schema };

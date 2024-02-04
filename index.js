@@ -6,7 +6,7 @@ const db = require('./init/initDb');
 const { filter, filterOptionsFromReq, aggregateFilter, filterAggregateOptionsFromReq } = require('./util/filter');
 const getRunImageIds = require('./util/getRunImages');
 const { runExists, getRunById } = require('./util/runs');
-const { run_schema, user_schema, image_schema } = require('./util/validate');
+const { run_schema, image_schema, run_options_schema } = require('./util/validate');
 
 const app = express();
 app.use(bodyParser.json());
@@ -18,7 +18,6 @@ const parseRawBody = bodyParser.raw({
 });
 
 app.post('/add-run', (req, res) => {
-
     const { error, value } = run_schema.validate(req.body);
     const { user_id, nick_name, duration_in_ms, distance_in_km, avg_heart_rate, start_time_in_ux_ms, end_time_in_ux_ms, runner_note } = value;
 
@@ -26,6 +25,7 @@ app.post('/add-run', (req, res) => {
         return res.status(400).send({ success: false, error: error.details });
     }
 
+    // inserts run into db
     const sql = `INSERT INTO runs (user_id, 
                                     nick_name, 
                                     duration_in_ms, 
@@ -141,9 +141,14 @@ app.get('/user/:user_id/aggregate-run-data', async (req, res) => {
 
 app.get('/user/:user_id/runs', async (req, res) => {
     const options = filterOptionsFromReq(req);
+    const {error, value} = run_options_schema.validate(options);
+
+    if (error) {
+        return res.status(400).send({ success: false, message: error.message });
+    }
 
     try {
-        let rows = await filter(options);
+        let rows = await filter(value);
         let rowsWithImageIds = [];
 
         for (let run of rows) {
