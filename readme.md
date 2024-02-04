@@ -13,6 +13,7 @@ This API allows for a client to submit run workouts, submit and retreive associa
 1. (optional) To populate the database with some test data, you can run the python script in `./scripts/pop_db.py`
 	- This script does not upload images correctly
 	- To upload images, use an API test client like Postman or Insomnia
+	- You can use the test images in `./scripts/images`
 1. By default, the API will serve from `localhost:3000`
 
 ## API Design
@@ -25,7 +26,7 @@ I used Express because of my familiarity with it and it's large ecosystem. Due t
 
 **Database:** SQLite
 
-I used SQLite simply for the sake of being in a dev environment. For production, I would normally use Firestore, but because of the scope and time constraint for this project, I used SQLite. I also think SQL works well for this case because the table relationships are fairly simple and the app is data heavy.
+I used SQLite simply for the sake of being in a dev environment. For production, I would normally use Firestore, but because of the scope and time constraint for this project, I used SQLite. I also think SQL works well for this case because the table relationships are fairly simple and the app is data heavy. Doing string manipulation to build SQL queries isn't ideal, but the same ideas transfer over well to more production ready databases.
 
 **Data Validation:** Joi/Custom
 
@@ -58,141 +59,14 @@ Images are submitted, retreived, and stored seperate from runs for the sake of s
 
 This API was built with the frontend in mind. I thought about how a frontend would interface with the data. I know from building frontends that you want as much control over the data as possible, but not so much control that you have to build a complicated request to get something simple. 
 
-I think a great example of this is the way data aggregation works. I imagine the frontend showing different statistics like average run distance on the user's profile. You can read more about the data aggregation endpoint in the docs, but essentially, a client can request any combination of statistics and functions (like mean, max, etc.). This allows incredible flexability on the frontend. If you want to show the average run distance somewhere, you can request just the average run distance. Even better, if you want to request it for runs in the past 30 days, you can do that as well dynamically.
+I think a great example of this is the way data aggregation works. I imagine the frontend showing different statistics like average run distance on the user's profile. You can read more about the data aggregation endpoint in the docs, but essentially, a client can request any combination of statistics and functions (like mean, max, etc.). This allows incredible flexability on the frontend. If you want to show the average run distance somewhere, you can request just the average run distance. Even better, if you want to request it for runs in the past 30 days, you can do that as well **dynamically**.
 
-## Docs
+## Challenges and Tradeoffs
 
-### add-run
+A big tradeoff that I've already talked about a little bit is complexity and simplicity. I could give the client control of every minor detail in their data, but then they would be overwhelmed by unnecesary complexity and could make mistakes more likely. On the other hand, I could just give the client all the data and make them sort through it on the client-side. This is of course not ideal as it's slow and voids helpful API abstraction all together. 
 
-**Endpoint:** `/add-run`
+I chose somewhere in the middle, leaning towards simplicity, but with added complexity where I thought neccesary. The data model is fairly simple and small, and I felt like there wouldn't be too many instances where the client would need *just* the distance of a particular run, *because if the client already knows about the run, they will already have all the data for that run*.
 
-Returns: submitted data and status
+Some complexity is neccesary for data aggregation, though. I used a "shopping cart" model to allow the client to query specific statistics and apply functions to them within their query. I chose complexity over simplicity here because I felt it would actually be used rather than just serving as another blocking force.
 
-Submit an individual run. Data is sent as a `json` body with the following shape:
-
-`user-id: Int` the id of the submitting user
-
-`nick-name: String` a nickname for the run
-
-`duration_in_ms: Int` the total duration of the run in miliseconds
-
-`distance_in_km: Float` the total distance of the run in kilometers
-
-`avg_heart_rate: Float` the runner's average heart rate over the duration of the run
-
-`start_time_in_ux_ms: Int` the start time of the run in Unix miliseconds
-
-`end_time_in_ux_ms: Int` the end time of the run in Unix miliseconds
-
-`runner_note: String` an optional note about the run
-
-### add-run-image
-
-**Endpoint:** `/add-run-image`
-
-Returns: status
-
-Optionally add an image to a run. Parameters are sent in the url and the image is sent as body. `Content-Type` must be `image/...`.
-
-`user_id: Int` The user id associated with the run and image
-
-`run_id: Int` The run associated with the image
-
-### runs
-
-**Endpoint:** `/user/:user_id/runs`
-
-Where `:user_id` is the id associated with the user
-
-Returns: `data: List` a list of runs with the following shape:
-
-```json
-{
-	"success": true,
-	"data": [
-		{
-			"run_id": 1,
-			"user_id": 1,
-			"nick_name": "Morning run",
-			"duration_in_ms": 3600000,
-			"distance_in_km": 10.5,
-			"avg_heart_rate": 140.5,
-			"start_time_in_ux_ms": 1675250730000,
-			"end_time_in_ux_ms": 1675254330000,
-			"runner_note": "Felt great, nice weather",
-			"image_ids": [
-				{
-					"image_id": 1
-				},
-				{
-					"image_id": 2
-				},
-				{
-					"image_id": 3
-				},
-				{
-					"image_id": 4
-				}
-			]
-		},
-        ...
-```
-
-Retreive an optionally filtered selection of runs from a specific user. To retreive _all_ runs, leave url parameters empty. Optionally, use these parameters to filter:
-
-`min_distance: Float` The minimum distance to query
-
-`max_distance: Float` The maximum distance to query
-
-`min_time: Int` The minimum start time in Unix miliseconds to query
-
-`max_time: Int` The maximum end time in Unix miliseconds to query
-
-`min_duration: Int` The minimum duration in Unix miliseconds to query
-
-`max_duration: Int` The maximum duration in Unix miliseconds to query
-
-`min_avg_heart_rate: Int` The minimum average heart rate to query
-
-`max_avg_heart_rate: Int` The maximum average heart rate to query
-
-### run-images
-
-**Endpoint:** `/run-images/:image_id`
-
-Returns: The image file corresponding to the `image_id`
-
-You can retreive any image by using the `image_id`. The `image_id` for any given run is given when you query for `runs`.
-
-### aggregate-run-data
-
-**Endpoint:** `/user/:user_id/aggregate-run-data`
-
-Returns: Your aggregate 'shopping list' in the following shape:
-
-```json
-{
-	"success": true,
-	"data": {
-		"avg_avg_heart_rate": 140.5,
-		"sum_duration_in_ms": 46800000
-		...
-	}
-}
-```
-
-Retreive aggregate data for a specific user. **All generic filters will work for this endpoint** i.e. you can use `min_distance` and it will return the aggregate data for all runs with that minimum distance (see `runs`). 
-
-You can dynamically retreive certain statistics using the following syntax:
-
-`metrics=avg_heart_rate:avg,duration_in_ms:sum,...`
-
-This query will retreive the average average heart rate for the user as well as the sum run duration.
-
-The following aggregate statistical functions are available: `avg`, `sum`, `min`, `max`. These can be applied to the following variables: `duration_in_ms`, `distance_in_km`, `avg_heart_rate`, `start_time_in_ux_ms`, `end_time_in_ux_ms`
-
-You can retreive any combination of aggregate statistics using this syntax:
-
-`variable:function,variable:function,...`
-
-Where a comma seperates individual statistics.
+This was a challenge to implement, especially on the data validation side of things. The `metric` query structure for the aggregation endpoint is dynamic, so you're not going to get the same kind of input each time. The query needs to be parsed to get each statistic request. I think given the tools I was working with, I did this fairly well.
