@@ -67,8 +67,6 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
     const runId = value.run_id;
     const contentType = value.mime_type;
 
-    console.log(value)
-
     const userId = req.query.user_id;
 
     if (!contentType) {
@@ -84,6 +82,10 @@ app.post('/add-run-image', parseRawBody, async (req, res) => {
 
     // convert binary file body to base64 string for storing directly in db
     const imageBase64 = Buffer.from(req.body).toString('base64');
+
+    if (imageBase64.length <= 0) {
+        return res.status(400).send({ success: false, message: "Invalid image" });
+    }
 
     const sql = `INSERT INTO run_images (run_id, run_image_base_64, mime_type) VALUES (?, ?, ?)`;
 
